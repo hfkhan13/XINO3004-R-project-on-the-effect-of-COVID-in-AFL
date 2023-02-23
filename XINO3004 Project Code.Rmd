@@ -1,0 +1,416 @@
+
+
+---
+title: "XINO Project"
+author: "Group 1"
+date: "2023-02-02"
+output: html_document
+---
+
+```{r}
+library(fitzRoy)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+```
+
+# Fitzroy package contains the functions to access the AFL data, dplyr is used for data transformations, ggplot for visualisation, tidyr for data manipulations
+
+**Data Transformation**
+
+```{r}
+first_year <- 2018
+last_year <- 2022
+year_column <- as.list(seq (first_year, last_year, 1))
+```
+
+# first year and last year of competition being analysed, year_column adds sequence from 2018 to 2022
+
+```{r}
+player_stats <- fetch_player_stats(season = 2021, round_number = 1, comp = "AFLM")
+tmp <- fetch_player_stats_footywire(season = 2021, round_number = 1)
+```
+
+# fitzRoy functions to get player stats and round information for round 1, to explore data and become familiar with the columns 
+
+```{r}
+for (year in first_year:last_year) {
+  if (year == 2020) { # remove round one from covid season
+    round_covid <- fetch_fixture(season = year, comp = "AFLM")
+    round_covid <- round_covid[!(round_covid$round.name=="Round 1"),]
+    
+    # find covid means
+    
+    a_round_covid <- data.frame(aggregate(home.score.goals ~ round.roundNumber, round_covid, mean), aggregate(home.score.behinds ~ round.roundNumber, round_covid, mean), aggregate(away.score.goals ~ round.roundNumber, round_covid, mean), aggregate(away.score.behinds ~ round.roundNumber, round_covid, mean), aggregate(home.score.totalScore ~ round.roundNumber, round_covid, mean), aggregate(away.score.totalScore ~ round.roundNumber, round_covid, mean))
+    
+#for loop utilising the fetch 
+  
+  a_round_covid <- a_round_covid[!duplicated(as.list(a_round_covid))]
+  
+  a_round_covid <- data.frame(a_round_covid$round.roundNumber, a_round_covid$home.score.goals + a_round_covid$away.score.goals, a_round_covid$home.score.behinds + a_round_covid$away.score.behinds, a_round_covid$home.score.totalScore + a_round_covid$away.score.totalScore)
+  } else {
+    round <- fetch_fixture(season = year, comp = "AFLM")
+    if (year == 2021) { # remove a column that isn't in other years
+      round <- subset(round, select = -c(metadata.travel_link, metadata.ticket_link))
+    }
+    if (year == 2022) {# remove columns that aren't in other years
+      round <- subset(round, select = -c(metadata.ticket_link))
+    }
+    if (year != first_year) {# merge years
+      round_noncovid <- rbind(round_noncovid, round)
+    }
+  }
+  
+  if (year == first_year) { # find means for first year
+    a_round <- data.frame(aggregate(home.score.goals ~ round.roundNumber, round, mean), aggregate(home.score.behinds ~ round.roundNumber, round, mean), aggregate(away.score.goals ~ round.roundNumber, round, mean), aggregate(away.score.behinds ~ round.roundNumber, round, mean), aggregate(home.score.totalScore ~ round.roundNumber, round, mean), aggregate(away.score.totalScore ~ round.roundNumber, round, mean))
+  
+  a_round <- a_round[!duplicated(as.list(a_round))]
+  
+  a_round_noncovid <- data.frame(a_round$round.roundNumber, a_round$home.score.goals + a_round$away.score.goals, a_round$home.score.behinds + a_round$away.score.behinds, a_round$home.score.totalScore + a_round$away.score.totalScore)
+  
+  round_noncovid <- round
+  } else{# find means and merge them with other years
+      a_round <- data.frame(aggregate(home.score.goals ~ round.roundNumber, round, mean), aggregate(home.score.behinds ~ round.roundNumber, round, mean), aggregate(away.score.goals ~ round.roundNumber, round, mean), aggregate(away.score.behinds ~ round.roundNumber, round, mean), aggregate(home.score.totalScore ~ round.roundNumber, round, mean), aggregate(away.score.totalScore ~ round.roundNumber, round, mean))
+  
+  a_round <- a_round[!duplicated(as.list(a_round))]
+  
+  a_round <- data.frame(a_round$round.roundNumber, a_round$home.score.goals + a_round$away.score.goals, a_round$home.score.behinds + a_round$away.score.behinds, a_round$home.score.totalScore + a_round$away.score.totalScore)
+  
+  a_round_noncovid <- rbind(a_round_noncovid, a_round)
+  }
+}
+assign('a_round_covid_final', data.frame(mean(a_round_covid[,2]), mean(a_round_covid[,3]), mean(a_round_covid[,4])))
+assign('a_round_noncovid_final', data.frame(mean(a_round_noncovid[,2]), mean(a_round_noncovid[,3]), mean(a_round_noncovid[,4])))
+```
+
+# Compile columns that are needed and find score averages for each round
+
+```{r}
+colnames(a_round_covid_final) <- c("average_goals", "average_behinds", "average_total_score")
+colnames(a_round_noncovid_final) <- c("average_goals", "average_behinds", "average_total_score")
+final_df <- rbind(a_round_covid_final, a_round_noncovid_final)
+colnames(final_df) <- c("average_goals", "average_behinds", "average_total_score")
+final_df <- round(final_df/2, 2)
+final_df$covid <- c('True', 'False') 
+```
+
+```{r}
+lmts <- range(c(round_covid$home.score.totalScore, round_covid$away.score.totalScore), c(round$home.score.totalScore, round$away.score.totalScore))
+a_round_noncovid_rates <- data.frame(a_round_noncovid$a_round.home.score.totalScore...a_round.away.score.totalScore/80)
+a_round_covid_rates <- data.frame(a_round_covid$a_round_covid.home.score.totalScore...a_round_covid.away.score.totalScore/64)
+```
+
+Make arrays from covid column
+
+```{r}
+true_arr <- array(data = TRUE, dim = length(a_round_covid_rates$a_round_covid.a_round_covid.home.score.totalScore...a_round_covid.away.score.totalScore.64))
+false_arr <- array(data = FALSE, dim = length(a_round_noncovid_rates$a_round_noncovid.a_round.home.score.totalScore...a_round.away.score.totalScore.80))
+```
+
+```{r}
+t_test_df <- data.frame(c(false_arr, true_arr), c(a_round_noncovid_rates$a_round_noncovid.a_round.home.score.totalScore...a_round.away.score.totalScore.80, a_round_covid_rates$a_round_covid.a_round_covid.home.score.totalScore...a_round_covid.away.score.totalScore.64))
+t.test(a_round_noncovid_rates$a_round_noncovid.a_round.home.score.totalScore...a_round.away.score.totalScore.80, a_round_covid_rates$a_round_covid.a_round_covid.home.score.totalScore...a_round_covid.away.score.totalScore.64, paired = FALSE, alternative = "two.sided")
+```
+
+
+```{r}
+first_year <- 2018
+last_year <- 2022
+full <- data.frame()
+for (year in first_year:last_year) {
+    temp <- data.frame(fetch_player_stats_footywire(season = year))
+    full <- rbind(full, temp)
+}
+```
+
+# loop over from first year to last year, getting the player stats for each year and then row bind the temporary file to the full dataframe
+
+```{r}
+df_sum_full <- full %>% 
+  dplyr::filter(!(Season == 2020 & Round == "Round 1")) %>%
+  group_by(Season, Match_id, Team) %>% 
+  summarise(across(c("One.Percenters", "K", "HB", "D", "M", "G", "B", "BO", "T", "HO", "CL", "TO"), sum), .groups = 'drop') %>% mutate(covid = case_when(
+    Season == 2020 ~ TRUE,
+    Season != 2020 ~ FALSE)) %>%
+  select(-K, -HB, -G, -B, -BO, -HO, -TO)
+```
+
+#filter out 2020 season round 1, group by season, match id and team. Sum the player stats for all the players to make team totals. Add a new column called covid where if the season is 2020, covid is True, if the season is not 2020, covid is False. Use select to drop performance indicator columns not being used. 
+
+```{r}
+df_sum <- df_sum_full %>% 
+  mutate(minutes = case_when(
+    covid == TRUE ~ 64,
+    covid == FALSE ~ 80)) %>%
+  mutate_at(c("One.Percenters", "D", "M", "T", "CL"), ~ . / minutes) %>%
+  select(-minutes)
+```
+
+```{r}  
+df_avg <- df_sum %>%
+  group_by(covid) %>%
+  summarise(across(c("One.Percenters", "D", "M", "T", "CL"), mean), .groups = 'drop')
+```
+
+```{r}
+str(filter(df_sum, covid == FALSE))
+str(filter(df_sum, covid == TRUE))
+```
+
+**Visualisation**
+
+*Total Score*
+
+```{r}
+par(mfrow=c(1, 2))
+boxplot(c(round_noncovid$home.score.totalScore, round_noncovid$away.score.totalScore), c(round_covid$home.score.totalScore, round_covid$away.score.totalScore), ylim = lmts, main = "Total", names = c("Covid", "Non-Covid"), col = c("Red", "Blue"))
+boxplot(a_round_noncovid_rates[, 1], a_round_covid_rates[, 1], main = "Rate", names = c("Covid",  "Non-Covid"), col = c("Red", "Blue"))
+```
+Q-Q plots
+
+```{r}
+qqnorm(c(a_round_noncovid_rates$a_round_noncovid.a_round.home.score.totalScore...a_round.away.score.totalScore.80, a_round_covid_rates$a_round_covid.a_round_covid.home.score.totalScore...a_round_covid.away.score.totalScore.64))
+qqline(c(a_round_noncovid_rates$a_round_noncovid.a_round.home.score.totalScore...a_round.away.score.totalScore.80, a_round_covid_rates$a_round_covid.a_round_covid.home.score.totalScore...a_round_covid.away.score.totalScore.64))
+```
+Histogram to look at distribution
+
+```{r}
+hist(c(a_round_covid_rates$a_round_covid.a_round_covid.home.score.totalScore...a_round_covid.away.score.totalScore.64, a_round_noncovid_rates$a_round_noncovid.a_round.home.score.totalScore...a_round.away.score.totalScore.80))
+```
+
+Normality test
+
+```{r}
+shapiro.test(c(a_round_covid_rates$a_round_covid.a_round_covid.home.score.totalScore...a_round_covid.away.score.totalScore.64, a_round_noncovid_rates$a_round_noncovid.a_round.home.score.totalScore...a_round.away.score.totalScore.80))
+```
+
+Variance test
+
+```{r}
+var.test(t_test_df$c.a_round_noncovid_rates.a_round_noncovid.a_round.home.score.totalScore...a_round.away.score.totalScore.80.. ~ t_test_df$c.false_arr..true_arr.)
+```
+t-test
+
+```{r}
+t.test(a_round_noncovid_rates$a_round_noncovid.a_round.home.score.totalScore...a_round.away.score.totalScore.80, a_round_covid_rates$a_round_covid.a_round_covid.home.score.totalScore...a_round_covid.away.score.totalScore.64, paired = FALSE, alternative = "two.sided")
+```
+
+*One Percenters*
+
+```{r}
+par(mfrow=c(1, 2))
+boxplot(df_sum_full[df_sum_full$covid == TRUE, ]$One.Percenters, df_sum_full[df_sum_full$covid == FALSE, ]$One.Percenters, 
+        main = "Total", 
+        names = c("Covid", "Non-Covid"), 
+        col = c("Red", "Blue"))
+boxplot(df_sum[df_sum_full$covid == TRUE, ]$One.Percenters, df_sum[df_sum_full$covid == FALSE, ]$One.Percenters,
+        main = "Rate", 
+        names = c("Covid", "Non-Covid"), 
+        col = c("Red", "Blue"))
+```
+# boxplot comparing covid and non-covid distributions for totals data on the left and rates data on the right.
+
+```{r}
+qqnorm(df_sum$One.Percenters)
+qqline(df_sum$One.Percenters)
+```
+# qq plot to visually check for normality assumption
+
+```{r}
+hist(df_sum$One.Percenters)
+```
+# histogram to see distribution of rates data
+
+```{r}
+shapiro.test(df_sum$One.Percenters)
+```
+# shapiro test to check normality assumption of rates data
+
+```{r}
+var.test(df_sum$One.Percenters ~ df_sum$covid)
+```
+# f test to check constant variance assumption across one percenters data
+
+```{r}
+wilcox.test(df_sum$One.Percenters ~ df_sum$covid, paired = FALSE, alternative = "two.sided", var.equal = FALSE)
+```
+# wilcox rank test used due to the large number of outliers
+
+*Disposals*
+
+```{r}
+par(mfrow=c(1, 2))
+boxplot(df_sum_full[df_sum_full$covid == TRUE, ]$D, df_sum_full[df_sum_full$covid == FALSE, ]$D,
+        main = "Total", 
+        names = c("Covid", "Non-Covid"), 
+        col = c("Red", "Blue"))
+boxplot(df_sum[df_sum_full$covid == TRUE, ]$D, df_sum[df_sum_full$covid == FALSE, ]$D, 
+        main = "Rate", 
+        names = c("Covid", "Non-Covid"), 
+        col = c("Red", "Blue"))
+```
+# boxplot comparing covid and non-covid distributions for totals data on the left and rates data on the right.
+
+```{r}
+qqnorm(df_sum$D)
+qqline(df_sum$D)
+```
+# qq plot to visually check for normality assumption
+
+```{r}
+hist(df_sum$D)
+```
+# histogram to see distribution of rates data
+
+```{r}
+shapiro.test(df_sum$D)
+```
+# shapiro test to check normality assumption of rates data
+
+```{r}
+var.test(df_sum$D ~ df_sum$covid)
+```
+# f test to check constant variance assumption across disposal data
+
+```{r}
+wilcox.test(df_sum$D ~ df_sum$covid, paired = FALSE, alternative = "two.sided", var.equal = FALSE)
+```
+# wilcox rank test used due to the large number of outliers
+
+*Marks*
+
+```{r}
+par(mfrow=c(1, 2))
+boxplot(df_sum_full[df_sum_full$covid == TRUE, ]$M, df_sum_full[df_sum_full$covid == FALSE, ]$M, 
+        main = "Total", 
+        names = c("Covid", "Non-Covid"), 
+        col = c("Red", "Blue"))
+boxplot(df_sum[df_sum_full$covid == TRUE, ]$M, df_sum[df_sum_full$covid == FALSE, ]$M, 
+        main = "Rate", 
+        names = c("Covid", "Non-Covid"), 
+        col = c("Red", "Blue"))
+```
+# boxplot comparing covid and non-covid distributions for totals data on the left and rates data on the right.
+
+```{r}
+qqnorm(df_sum$M)
+qqline(df_sum$M)
+```
+# qq plot to visually check for normality assumption
+
+```{r}
+hist(df_sum$M)
+```
+# histogram to see distribution of rates data
+
+```{r}
+shapiro.test(df_sum$M)
+```
+# shapiro test to check normality assumption of rates data
+
+```{r}
+var.test(df_sum$M ~ df_sum$covid)
+```
+# f test to check constant variance assumption across Marks data
+
+```{r}
+wilcox.test(df_sum$M ~ df_sum$covid, paired = FALSE, alternative = "two.sided", var.equal = FALSE)
+```
+# wilcox rank test used due to the large number of outliers
+
+*Tackles*
+
+```{r}
+par(mfrow=c(1, 2))
+boxplot(df_sum_full[df_sum_full$covid == TRUE, ]$T, df_sum_full[df_sum_full$covid == FALSE, ]$T, 
+        main = "Total", 
+        names = c("Covid", "Non-Covid"), 
+        col = c("Red", "Blue"))
+boxplot(df_sum[df_sum_full$covid == TRUE, ]$T, df_sum[df_sum_full$covid == FALSE, ]$T, 
+        main = "Rate", 
+        names = c("Covid", "Non-Covid"), 
+        col = c("Red", "Blue"))
+```
+# boxplot comparing covid and non-covid distributions for totals data on the left and rates data on the right.
+
+```{r}
+qqnorm(df_sum$T)
+qqline(df_sum$T)
+```
+# qq plot to visually check for normality assumption
+
+```{r}
+hist(df_sum$T)
+```
+# histogram to see distribution of rates data
+
+```{r}
+shapiro.test(df_sum$T)
+```
+# shapiro test to check normality assumption of rates data
+
+```{r}
+var.test(df_sum$T ~ df_sum$covid)
+```
+# f test to check constant variance assumption across one Tackle data
+
+```{r}
+wilcox.test(df_sum$T ~ df_sum$covid, paired = FALSE, alternative = "two.sided", var.equal = FALSE)
+```
+# wilcox rank test used due to the large number of outliers
+
+**Performance Indicator Adjustments**
+
+```{r}
+df_avg <- df_avg[, c("covid", "One.Percenters","D","M","T","CL")]
+```
+
+```{r}
+df_avg %>% pivot_longer(cols=colnames(df_avg)[-1],
+                        names_to = "PI",
+                        values_to = "vals") %>%
+  ggplot(aes(x = PI, y = vals, color = covid, size =2, alpha = 0.5))+
+  geom_point()
+```
+```{r}
+# calculating single scale factor required to minimise the squared differences between covid and non-covid - i.e the "coefficient of best fit" (like line of best fit but just one value)
+sf_range <- seq(0.5,2.0,by=0.025)
+sums <- vector()
+looprange <- 2:ncol(df_avg)
+for (j in sf_range){
+  diffs <- vector()
+  for (i in looprange){
+    dif <- df_avg[[1,i]]-(df_avg[[2,i]]*j)
+    diffs <- c(diffs, dif)
+    total <- sum(diffs)
+  }
+  sums <- c(sums, total)
+}
+#plotting to find minimising scale factor
+sfactors <- cbind(sf_range, sums)
+plot(sfactors)
+abline(h=0, col="red")
+```
+```{r}
+#selecting minimising scale factor 
+sums[which.min(abs(sums-0))]
+```
+```{r}
+#calculating scale factor needed to transform covid data to non covid
+sfs <- vector()
+looprange <- 2:ncol(df_avg)
+for (i in looprange){
+  sfs <- c(sfs, df_avg[[1,i]]/df_avg[[2,i]])
+}
+sfs
+```
+
+**Leftover Code**
+
+*Clangers*
+
+```{r}
+par(mfrow=c(1, 2))
+boxplot(df_sum_full[df_sum_full$covid == TRUE, ]$CL, df_sum_full[df_sum_full$covid == FALSE, ]$CL, main = "Total", names = c("Covid", "Non-Covid"), col = c("Red", "Blue"))
+boxplot(df_sum[df_sum_full$covid == TRUE, ]$CL, df_sum[df_sum_full$covid == FALSE, ]$CL, main = "Rate", names = c("Covid", "Non-Covid"), col = c("Red", "Blue"))
+```
